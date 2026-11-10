@@ -92,11 +92,14 @@ def cmd_add(tasks, title, data_path):
     return 0
 
 
-def cmd_list(tasks):
-    if not tasks:
-        print("No tasks yet.")
+def cmd_list(tasks, completed_only=False):
+    visible = tasks
+    if completed_only:
+        visible = [task for task in tasks if task["completed"]]
+    if not visible:
+        print("No completed tasks." if completed_only and tasks else "No tasks yet.")
         return 0
-    for task in tasks:
+    for task in visible:
         status = "x" if task["completed"] else " "
         print(f"[{status}] {task['id']}. {task['title']}")
     return 0
@@ -141,7 +144,12 @@ def build_parser():
     # SUPPRESS keeps this sub-option from clobbering the top-level --data-file.
     add_data_file_option(add_parser, default=argparse.SUPPRESS)
 
-    list_parser = subparsers.add_parser("list", help="list all tasks")
+    list_parser = subparsers.add_parser("list", help="list tasks")
+    list_parser.add_argument(
+        "--completed-only",
+        action="store_true",
+        help="show only completed tasks",
+    )
     add_data_file_option(list_parser, default=argparse.SUPPRESS)
 
     complete_parser = subparsers.add_parser("complete", help="mark a task as complete")
@@ -165,7 +173,7 @@ def main(argv=None):
         if args.command == "add":
             return cmd_add(tasks, args.title, data_path)
         if args.command == "list":
-            return cmd_list(tasks)
+            return cmd_list(tasks, completed_only=args.completed_only)
         return cmd_complete(tasks, args.task_id, data_path)
     except OSError as exc:
         print(f"Error: cannot write data file {data_path} ({exc})", file=sys.stderr)
