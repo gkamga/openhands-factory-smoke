@@ -92,12 +92,22 @@ def cmd_add(tasks, title, data_path):
     return 0
 
 
-def cmd_list(tasks, completed_only=False):
+def cmd_list(tasks, completed_only=False, title_contains=None):
     visible = tasks
     if completed_only:
         visible = [task for task in tasks if task["completed"]]
+    if title_contains is not None:
+        # casefold() gives a case-insensitive match that also works for
+        # non-ASCII titles, unlike lower().
+        needle = title_contains.casefold()
+        visible = [task for task in visible if needle in task["title"].casefold()]
     if not visible:
-        print("No completed tasks." if completed_only and tasks else "No tasks yet.")
+        if not tasks:
+            print("No tasks yet.")
+        elif title_contains is not None:
+            print("No matching tasks.")
+        else:
+            print("No completed tasks.")
         return 0
     for task in visible:
         status = "x" if task["completed"] else " "
@@ -150,6 +160,13 @@ def build_parser():
         action="store_true",
         help="show only completed tasks",
     )
+    list_parser.add_argument(
+        "--title-contains",
+        dest="title_contains",
+        default=None,
+        metavar="TEXT",
+        help="show only tasks whose title contains TEXT (case-insensitive)",
+    )
     add_data_file_option(list_parser, default=argparse.SUPPRESS)
 
     complete_parser = subparsers.add_parser("complete", help="mark a task as complete")
@@ -173,7 +190,11 @@ def main(argv=None):
         if args.command == "add":
             return cmd_add(tasks, args.title, data_path)
         if args.command == "list":
-            return cmd_list(tasks, completed_only=args.completed_only)
+            return cmd_list(
+                tasks,
+                completed_only=args.completed_only,
+                title_contains=args.title_contains,
+            )
         return cmd_complete(tasks, args.task_id, data_path)
     except OSError as exc:
         print(f"Error: cannot write data file {data_path} ({exc})", file=sys.stderr)
