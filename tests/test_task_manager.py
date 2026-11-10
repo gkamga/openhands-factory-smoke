@@ -153,6 +153,89 @@ class TaskManagerCliTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), "No tasks yet.")
         self.assertFalse(os.path.exists(self.data_file))
 
+    def test_list_shows_completed_and_incomplete_tasks_together(self):
+        self.run_cli("add", "Done")
+        self.run_cli("add", "Pending")
+        self.run_cli("complete", "1")
+
+        result = self.run_cli("list")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout.splitlines(), ["[x] 1. Done", "[ ] 2. Pending"]
+        )
+
+    def test_list_completed_only_shows_only_completed_tasks(self):
+        for title in ("Done", "Pending", "Also done"):
+            self.assertEqual(self.run_cli("add", title).returncode, 0)
+        self.run_cli("complete", "1")
+        self.run_cli("complete", "3")
+
+        result = self.run_cli("list", "--completed-only")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout.splitlines(), ["[x] 1. Done", "[x] 3. Also done"]
+        )
+
+    def test_list_completed_only_without_completed_tasks_reports_empty(self):
+        self.run_cli("add", "Pending")
+
+        result = self.run_cli("list", "--completed-only")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No completed tasks.")
+
+    def test_list_completed_only_with_no_tasks_reports_empty(self):
+        result = self.run_cli("list", "--completed-only")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No tasks yet.")
+        self.assertFalse(os.path.exists(self.data_file))
+
+    def test_list_completed_only_works_with_subcommand_data_file(self):
+        self.write_raw(
+            json.dumps(
+                {
+                    "tasks": [
+                        {"id": 1, "title": "Done", "completed": True},
+                        {"id": 2, "title": "Pending", "completed": False},
+                    ]
+                }
+            )
+        )
+
+        result = self.run_cli(
+            "list",
+            "--completed-only",
+            "--data-file",
+            self.data_file,
+            data_file=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[x] 1. Done"])
+
+    def test_list_completed_only_leaves_data_file_unchanged(self):
+        self.write_raw(
+            json.dumps(
+                {
+                    "tasks": [
+                        {"id": 1, "title": "Done", "completed": True},
+                        {"id": 2, "title": "Pending", "completed": False},
+                    ]
+                }
+            )
+        )
+        with open(self.data_file, "r", encoding="utf-8") as handle:
+            original = handle.read()
+
+        result = self.run_cli("list", "--completed-only")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(self.data_file, "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), original)
+
     def test_data_file_option_after_subcommand(self):
         result = self.run_cli("add", "--data-file", self.data_file, "After option")
 

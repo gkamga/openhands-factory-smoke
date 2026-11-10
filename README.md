@@ -49,6 +49,16 @@ python3 task_manager.py list
 # [x] 1. Buy groceries
 ```
 
+Show only the tasks that are already complete:
+
+```bash
+python3 task_manager.py list --completed-only
+# [x] 1. Buy groceries
+```
+
+If no task is complete, the command reports `No completed tasks.` and exits
+with `0`. Without the flag, `list` keeps showing every task.
+
 Use a separate data file (useful for experiments or tests):
 
 ```bash
