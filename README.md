@@ -59,6 +59,25 @@ python3 task_manager.py list --completed-only
 If no task is complete, the command reports `No completed tasks.` and exits
 with `0`. Without the flag, `list` keeps showing every task.
 
+Show only the tasks whose title contains some text:
+
+```bash
+python3 task_manager.py list --title-contains groceries
+# [x] 1. Buy groceries
+```
+
+The match is a plain case-insensitive substring, so `--title-contains BUY`
+finds both `Buy groceries` and `buy milk`. When no task matches, the command
+reports `No matching tasks.` and exits with `0`. With an empty data file it
+still reports `No tasks yet.`
+
+Both filters can be combined; the result contains only tasks that satisfy each
+one:
+
+```bash
+python3 task_manager.py list --completed-only --title-contains report
+```
+
 Use a separate data file (useful for experiments or tests):
 
 ```bash

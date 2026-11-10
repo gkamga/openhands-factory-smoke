@@ -36,6 +36,9 @@ class TaskManagerCliTests(unittest.TestCase):
         with open(self.data_file, "wb") as handle:
             handle.write(content)
 
+    def seed_tasks(self, tasks):
+        self.write_raw(json.dumps({"tasks": tasks}))
+
     def test_add_creates_task_with_expected_fields(self):
         result = self.run_cli("add", "Buy groceries")
 
@@ -258,6 +261,154 @@ class TaskManagerCliTests(unittest.TestCase):
         self.assertTrue(os.path.exists(default_path))
         with open(default_path, "r", encoding="utf-8") as handle:
             self.assertEqual(json.load(handle)["tasks"][0]["title"], "Default path")
+
+    def test_list_title_filter_matches_case_insensitively(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Buy groceries", "completed": False},
+                {"id": 2, "title": "buy milk", "completed": False},
+                {"id": 3, "title": "Write report", "completed": False},
+            ]
+        )
+
+        result = self.run_cli("list", "--title-contains", "BUY")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout.splitlines(),
+            ["[ ] 1. Buy groceries", "[ ] 2. buy milk"],
+        )
+
+    def test_list_title_filter_matches_substring_anywhere(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Write quarterly report", "completed": False},
+                {"id": 2, "title": "Read a book", "completed": False},
+            ]
+        )
+
+        result = self.run_cli("list", "--title-contains", "quarter")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 1. Write quarterly report"])
+
+    def test_list_title_filter_treats_text_literally(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Ship C++ build", "completed": False},
+                {"id": 2, "title": "Ship C build", "completed": False},
+            ]
+        )
+
+        result = self.run_cli("list", "--title-contains", "C++")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 1. Ship C++ build"])
+
+    def test_list_title_filter_is_case_insensitive_for_unicode(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Café planning", "completed": False},
+                {"id": 2, "title": "Other work", "completed": False},
+            ]
+        )
+
+        result = self.run_cli("list", "--title-contains", "CAFÉ")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 1. Café planning"])
+
+    def test_list_title_filter_without_match_reports_empty(self):
+        self.seed_tasks([{"id": 1, "title": "Write report", "completed": False}])
+
+        result = self.run_cli("list", "--title-contains", "groceries")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No matching tasks.")
+
+    def test_list_title_filter_with_no_tasks_reports_empty(self):
+        result = self.run_cli("list", "--title-contains", "anything")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No tasks yet.")
+        self.assertFalse(os.path.exists(self.data_file))
+
+    def test_list_title_filter_combines_with_completed_only(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Buy groceries", "completed": True},
+                {"id": 2, "title": "Buy stamps", "completed": False},
+                {"id": 3, "title": "Write report", "completed": True},
+            ]
+        )
+
+        result = self.run_cli(
+            "list", "--completed-only", "--title-contains", "buy"
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[x] 1. Buy groceries"])
+
+    def test_list_title_filter_combined_with_completed_only_no_match(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Buy stamps", "completed": False},
+                {"id": 2, "title": "Write report", "completed": True},
+            ]
+        )
+
+        result = self.run_cli(
+            "list", "--completed-only", "--title-contains", "buy"
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No matching tasks.")
+
+    def test_list_title_filter_leaves_data_file_unchanged(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Buy groceries", "completed": False},
+                {"id": 2, "title": "Write report", "completed": True},
+            ]
+        )
+        with open(self.data_file, "r", encoding="utf-8") as handle:
+            original = handle.read()
+
+        result = self.run_cli("list", "--title-contains", "buy")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(self.data_file, "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), original)
+
+    def test_list_title_filter_works_with_subcommand_data_file(self):
+        self.seed_tasks([{"id": 1, "title": "Buy groceries", "completed": False}])
+
+        result = self.run_cli(
+            "list",
+            "--title-contains",
+            "buy",
+            "--data-file",
+            self.data_file,
+            data_file=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 1. Buy groceries"])
+
+    def test_list_title_filter_accepts_data_file_before_subcommand(self):
+        self.seed_tasks([{"id": 1, "title": "Buy groceries", "completed": False}])
+
+        result = self.run_cli(
+            "--data-file",
+            self.data_file,
+            "list",
+            "--title-contains",
+            "buy",
+            data_file=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 1. Buy groceries"])
 
     def test_titles_with_unicode_and_quotes_round_trip(self):
         title = 'Café "meeting" — 09:00'
