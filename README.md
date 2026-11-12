@@ -77,9 +77,10 @@ python3 task_manager.py list --title-contains groceries
 ```
 
 The match is a plain case-insensitive substring, so `--title-contains BUY`
-finds both `Buy groceries` and `buy milk`. When no task matches, the command
-reports `No matching tasks.` and exits with `0`. With an empty data file it
-still reports `No tasks yet.`
+finds both `Buy groceries` and `buy milk`. Unicode case folding applies too, so
+`--title-contains STRASSE` finds `Straße review`. When no task matches, the
+command reports `No matching tasks.` and exits with `0`. With an empty data file
+it still reports `No tasks yet.`
 
 Both filters can be combined; the result contains only tasks that satisfy each
 one:

@@ -101,8 +101,8 @@ def cmd_list(tasks, completed_only=False, incomplete_only=False, title_contains=
     if title_contains is not None:
         # casefold() gives a case-insensitive match that also works for
         # non-ASCII titles, unlike lower().
-        needle = title_contains.lower()
-        visible = [task for task in visible if needle in task["title"].lower()]
+        needle = title_contains.casefold()
+        visible = [task for task in visible if needle in task["title"].casefold()]
     if not visible:
         if not tasks:
             print("No tasks yet.")
