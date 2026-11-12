@@ -115,6 +115,11 @@ def cmd_list(tasks, completed_only=False, title_contains=None):
     return 0
 
 
+def cmd_count(tasks):
+    print(f"Total tasks: {len(tasks)}")
+    return 0
+
+
 def cmd_complete(tasks, task_id, data_path):
     task = find_task(tasks, task_id)
     if task is None:
@@ -173,6 +178,11 @@ def build_parser():
     complete_parser.add_argument("task_id", type=int, metavar="ID", help="task ID")
     add_data_file_option(complete_parser, default=argparse.SUPPRESS)
 
+    count_parser = subparsers.add_parser(
+        "count", help="print the total number of tasks"
+    )
+    add_data_file_option(count_parser, default=argparse.SUPPRESS)
+
     return parser
 
 
@@ -195,6 +205,8 @@ def main(argv=None):
                 completed_only=args.completed_only,
                 title_contains=args.title_contains,
             )
+        if args.command == "count":
+            return cmd_count(tasks)
         return cmd_complete(tasks, args.task_id, data_path)
     except OSError as exc:
         print(f"Error: cannot write data file {data_path} ({exc})", file=sys.stderr)

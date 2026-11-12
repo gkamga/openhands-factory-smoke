@@ -78,6 +78,16 @@ one:
 python3 task_manager.py list --completed-only --title-contains report
 ```
 
+Count every task, including completed ones:
+
+```bash
+python3 task_manager.py count
+# Total tasks: 2
+```
+
+With an empty or missing data file the command reports `Total tasks: 0` and
+exits with `0`. `count` never modifies the data file.
+
 Use a separate data file (useful for experiments or tests):
 
 ```bash
