@@ -239,6 +239,144 @@ class TaskManagerCliTests(unittest.TestCase):
         with open(self.data_file, "r", encoding="utf-8") as handle:
             self.assertEqual(handle.read(), original)
 
+    def test_list_incomplete_only_shows_only_incomplete_tasks(self):
+        for title in ("Done", "Pending", "Also done"):
+            self.assertEqual(self.run_cli("add", title).returncode, 0)
+        self.run_cli("complete", "1")
+        self.run_cli("complete", "3")
+
+        result = self.run_cli("list", "--incomplete-only")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 2. Pending"])
+
+    def test_list_incomplete_only_without_incomplete_tasks_reports_empty(self):
+        self.run_cli("add", "Done")
+        self.run_cli("complete", "1")
+
+        result = self.run_cli("list", "--incomplete-only")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No incomplete tasks.")
+
+    def test_list_incomplete_only_with_no_tasks_reports_empty(self):
+        result = self.run_cli("list", "--incomplete-only")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No tasks yet.")
+        self.assertFalse(os.path.exists(self.data_file))
+
+    def test_list_incomplete_only_combines_with_title_filter(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Buy groceries", "completed": True},
+                {"id": 2, "title": "Buy stamps", "completed": False},
+                {"id": 3, "title": "Write report", "completed": False},
+            ]
+        )
+
+        result = self.run_cli(
+            "list", "--incomplete-only", "--title-contains", "buy"
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 2. Buy stamps"])
+
+    def test_list_incomplete_only_combined_with_title_filter_no_match(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Buy groceries", "completed": True},
+                {"id": 2, "title": "Write report", "completed": False},
+            ]
+        )
+
+        result = self.run_cli(
+            "list", "--incomplete-only", "--title-contains", "buy"
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No matching tasks.")
+
+    def test_list_incomplete_only_uses_casefold_for_unicode_titles(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Café planning", "completed": False},
+                {"id": 2, "title": "Café review", "completed": True},
+            ]
+        )
+
+        result = self.run_cli(
+            "list", "--incomplete-only", "--title-contains", "CAFÉ"
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 1. Café planning"])
+
+    def test_list_incomplete_only_title_filter_matches_casefold_expansions(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Straße review", "completed": False},
+                {"id": 2, "title": "Straße audit", "completed": True},
+            ]
+        )
+
+        result = self.run_cli(
+            "list", "--incomplete-only", "--title-contains", "STRASSE"
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 1. Straße review"])
+
+    def test_list_incomplete_only_combines_with_completed_only(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Done", "completed": True},
+                {"id": 2, "title": "Pending", "completed": False},
+            ]
+        )
+
+        result = self.run_cli(
+            "list", "--incomplete-only", "--completed-only"
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "No matching tasks.")
+
+    def test_list_incomplete_only_leaves_data_file_unchanged(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Done", "completed": True},
+                {"id": 2, "title": "Pending", "completed": False},
+            ]
+        )
+        with open(self.data_file, "r", encoding="utf-8") as handle:
+            original = handle.read()
+
+        result = self.run_cli("list", "--incomplete-only")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(self.data_file, "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), original)
+
+    def test_list_incomplete_only_works_with_subcommand_data_file(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Done", "completed": True},
+                {"id": 2, "title": "Pending", "completed": False},
+            ]
+        )
+
+        result = self.run_cli(
+            "list",
+            "--incomplete-only",
+            "--data-file",
+            self.data_file,
+            data_file=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 2. Pending"])
+
     def test_data_file_option_after_subcommand(self):
         result = self.run_cli("add", "--data-file", self.data_file, "After option")
 
@@ -317,6 +455,19 @@ class TaskManagerCliTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.splitlines(), ["[ ] 1. Café planning"])
+
+    def test_list_title_filter_matches_casefold_expansions(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Straße review", "completed": False},
+                {"id": 2, "title": "Other work", "completed": False},
+            ]
+        )
+
+        result = self.run_cli("list", "--title-contains", "STRASSE")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["[ ] 1. Straße review"])
 
     def test_list_title_filter_without_match_reports_empty(self):
         self.seed_tasks([{"id": 1, "title": "Write report", "completed": False}])
