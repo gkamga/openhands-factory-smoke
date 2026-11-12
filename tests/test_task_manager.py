@@ -523,6 +523,85 @@ class TaskManagerCliTests(unittest.TestCase):
         with open(self.data_file, "rb") as handle:
             self.assertEqual(handle.read(), original)
 
+    def test_count_with_no_data_file_reports_zero(self):
+        result = self.run_cli("count")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "Total tasks: 0")
+        self.assertFalse(os.path.exists(self.data_file))
+
+    def test_count_with_empty_data_file_reports_zero(self):
+        self.seed_tasks([])
+
+        result = self.run_cli("count")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "Total tasks: 0")
+
+    def test_count_includes_completed_tasks(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Done", "completed": True},
+                {"id": 2, "title": "Pending", "completed": False},
+                {"id": 3, "title": "Also done", "completed": True},
+            ]
+        )
+
+        result = self.run_cli("count")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "Total tasks: 3")
+
+    def test_count_reflects_tasks_added_through_the_cli(self):
+        self.run_cli("add", "One")
+        self.run_cli("add", "Two")
+        self.run_cli("complete", "1")
+
+        result = self.run_cli("count")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "Total tasks: 2")
+
+    def test_count_leaves_data_file_unchanged(self):
+        self.seed_tasks(
+            [
+                {"id": 1, "title": "Done", "completed": True},
+                {"id": 2, "title": "Pending", "completed": False},
+            ]
+        )
+        with open(self.data_file, "r", encoding="utf-8") as handle:
+            original = handle.read()
+
+        result = self.run_cli("count")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(self.data_file, "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), original)
+
+    def test_count_accepts_data_file_after_subcommand(self):
+        self.seed_tasks([{"id": 1, "title": "Buy groceries", "completed": False}])
+
+        result = self.run_cli("count", "--data-file", self.data_file, data_file=False)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "Total tasks: 1")
+
+    def test_count_accepts_data_file_before_subcommand(self):
+        self.seed_tasks([{"id": 1, "title": "Buy groceries", "completed": False}])
+
+        result = self.run_cli("--data-file", self.data_file, "count", data_file=False)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "Total tasks: 1")
+
+    def test_count_corrupt_data_file_reports_error(self):
+        self.write_raw("{not json")
+
+        result = self.run_cli("count")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("is not valid JSON", result.stderr)
+
     def test_missing_command_fails(self):
         result = self.run_cli()
 
