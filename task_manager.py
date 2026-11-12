@@ -92,10 +92,12 @@ def cmd_add(tasks, title, data_path):
     return 0
 
 
-def cmd_list(tasks, completed_only=False, title_contains=None):
+def cmd_list(tasks, completed_only=False, incomplete_only=False, title_contains=None):
     visible = tasks
     if completed_only:
-        visible = [task for task in tasks if task["completed"]]
+        visible = [task for task in visible if task["completed"]]
+    if incomplete_only:
+        visible = [task for task in visible if not task["completed"]]
     if title_contains is not None:
         # casefold() gives a case-insensitive match that also works for
         # non-ASCII titles, unlike lower().
@@ -104,10 +106,15 @@ def cmd_list(tasks, completed_only=False, title_contains=None):
     if not visible:
         if not tasks:
             print("No tasks yet.")
+        elif completed_only and incomplete_only:
+            # Both status filters are contradictory, so nothing can match.
+            print("No matching tasks.")
         elif title_contains is not None:
             print("No matching tasks.")
-        else:
+        elif completed_only:
             print("No completed tasks.")
+        else:
+            print("No incomplete tasks.")
         return 0
     for task in visible:
         status = "x" if task["completed"] else " "
@@ -161,6 +168,12 @@ def build_parser():
         help="show only completed tasks",
     )
     list_parser.add_argument(
+        "--incomplete-only",
+        dest="incomplete_only",
+        action="store_true",
+        help="show only incomplete tasks",
+    )
+    list_parser.add_argument(
         "--title-contains",
         dest="title_contains",
         default=None,
@@ -193,6 +206,7 @@ def main(argv=None):
             return cmd_list(
                 tasks,
                 completed_only=args.completed_only,
+                incomplete_only=args.incomplete_only,
                 title_contains=args.title_contains,
             )
         return cmd_complete(tasks, args.task_id, data_path)
